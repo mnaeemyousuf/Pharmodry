@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t"><title id="t">Pharmodry</title><g transform="translate(0 0) scale(1)">
+    <defs><clipPath id="pmdm-cap"><rect x="35" y="0" width="29" height="64"/></clipPath></defs>
+    <rect width="64" height="64" rx="15" fill="#0B1E3F"/>
+    <g fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 50V16" stroke="#FFFFFF"/>
+      <path d="M21 16h14a11 11 0 0 1 0 22H21" stroke="#FFFFFF"/>
+      <path d="M21 16h14a11 11 0 0 1 0 22H21" stroke="#FFFFFF" clip-path="url(#pmdm-cap)"/>
+    </g>
+    <circle cx="45" cy="49" r="4.5" fill="#FFFFFF"/>
+  </g></svg>

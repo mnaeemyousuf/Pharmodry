@@ -1,0 +1,213 @@
+{
+  "generated": "2026-10-25",
+  "version": "0.1.0",
+  "manuals": [
+    {
+      "role": "Super Admin",
+      "code": "SUPER_ADMIN",
+      "pdf": "docs/USER_MANUALS/PDF/01_Super_Admin_User_Manual.pdf",
+      "pages": 96,
+      "bytes": 15935309,
+      "figures": 92,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Company Admin",
+      "code": "COMPANY_ADMIN",
+      "pdf": "docs/USER_MANUALS/PDF/02_Company_Admin_User_Manual.pdf",
+      "pages": 62,
+      "bytes": 9675313,
+      "figures": 52,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Plant Manager",
+      "code": "PLANT_MANAGER",
+      "pdf": "docs/USER_MANUALS/PDF/03_Plant_Manager_User_Manual.pdf",
+      "pages": 58,
+      "bytes": 9095358,
+      "figures": 48,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Production Manager",
+      "code": "PRODUCTION_MANAGER",
+      "pdf": "docs/USER_MANUALS/PDF/04_Production_Manager_User_Manual.pdf",
+      "pages": 69,
+      "bytes": 11259561,
+      "figures": 61,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Production Supervisor",
+      "code": "PRODUCTION_SUPERVISOR",
+      "pdf": "docs/USER_MANUALS/PDF/05_Production_Supervisor_User_Manual.pdf",
+      "pages": 57,
+      "bytes": 8266551,
+      "figures": 47,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Production Operator",
+      "code": "PRODUCTION_OPERATOR",
+      "pdf": "docs/USER_MANUALS/PDF/06_Production_Operator_User_Manual.pdf",
+      "pages": 40,
+      "bytes": 4146414,
+      "figures": 26,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "QA Manager",
+      "code": "QA_MANAGER",
+      "pdf": "docs/USER_MANUALS/PDF/07_QA_Manager_User_Manual.pdf",
+      "pages": 71,
+      "bytes": 11790015,
+      "figures": 64,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "QA Officer",
+      "code": "QA_OFFICER",
+      "pdf": "docs/USER_MANUALS/PDF/08_QA_Officer_User_Manual.pdf",
+      "pages": 63,
+      "bytes": 10365914,
+      "figures": 55,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "QC Manager",
+      "code": "QC_MANAGER",
+      "pdf": "docs/USER_MANUALS/PDF/09_QC_Manager_User_Manual.pdf",
+      "pages": 57,
+      "bytes": 8530225,
+      "figures": 48,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "QC Analyst",
+      "code": "QC_ANALYST",
+      "pdf": "docs/USER_MANUALS/PDF/10_QC_Analyst_User_Manual.pdf",
+      "pages": 51,
+      "bytes": 6906160,
+      "figures": 40,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Warehouse Manager",
+      "code": "WAREHOUSE_MANAGER",
+      "pdf": "docs/USER_MANUALS/PDF/11_Warehouse_Manager_User_Manual.pdf",
+      "pages": 54,
+      "bytes": 7861535,
+      "figures": 42,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Warehouse Officer",
+      "code": "WAREHOUSE_OFFICER",
+      "pdf": "docs/USER_MANUALS/PDF/12_Warehouse_Officer_User_Manual.pdf",
+      "pages": 52,
+      "bytes": 7091357,
+      "figures": 40,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Procurement Manager",
+      "code": "PROCUREMENT_MANAGER",
+      "pdf": "docs/USER_MANUALS/PDF/13_Procurement_Manager_User_Manual.pdf",
+      "pages": 40,
+      "bytes": 4679334,
+      "figures": 30,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Procurement Officer",
+      "code": "PROCUREMENT_OFFICER",
+      "pdf": "docs/USER_MANUALS/PDF/14_Procurement_Officer_User_Manual.pdf",
+      "pages": 37,
+      "bytes": 4053055,
+      "figures": 26,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Supply Chain Planner",
+      "code": "SUPPLY_CHAIN_PLANNER",
+      "pdf": "docs/USER_MANUALS/PDF/15_Supply_Chain_Planner_User_Manual.pdf",
+      "pages": 51,
+      "bytes": 7753591,
+      "figures": 41,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Engineering / Maintenance",
+      "code": "ENGINEERING",
+      "pdf": "docs/USER_MANUALS/PDF/16_Engineering_Maintenance_User_Manual.pdf",
+      "pages": 38,
+      "bytes": 4102637,
+      "figures": 24,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Regulatory Affairs Officer",
+      "code": "REGULATORY_AFFAIRS",
+      "pdf": "docs/USER_MANUALS/PDF/17_Regulatory_Affairs_Officer_User_Manual.pdf",
+      "pages": 39,
+      "bytes": 4086926,
+      "figures": 24,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Auditor",
+      "code": "AUDITOR",
+      "pdf": "docs/USER_MANUALS/PDF/21_Auditor_User_Manual.pdf",
+      "pages": 56,
+      "bytes": 8899746,
+      "figures": 47,
+      "chapters": 20,
+      "brokenImages": []
+    },
+    {
+      "role": "Management Viewer",
+      "code": "MANAGEMENT_VIEWER",
+      "pdf": "docs/USER_MANUALS/PDF/22_Management_Viewer_User_Manual.pdf",
+      "pages": 54,
+      "bytes": 8285043,
+      "figures": 44,
+      "chapters": 20,
+      "brokenImages": []
+    }
+  ],
+  "deferred": [
+    {
+      "no": "18",
+      "title": "Pharmacovigilance Officer",
+      "note": "Not implemented in this release (no pharmacovigilance module). No manual generated."
+    },
+    {
+      "no": "19",
+      "title": "Sales / Distribution User",
+      "note": "Not implemented in this release (no sales or distribution module; dispatch is only an inventory transaction type). No manual generated."
+    },
+    {
+      "no": "20",
+      "title": "Accountant",
+      "note": "Not implemented in this release (Pharmodry does not replace the financial ERP). No manual generated."
+    }
+  ]
+}

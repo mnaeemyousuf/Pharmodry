@@ -1,0 +1,1551 @@
+// Pharmodry — PostgreSQL schema (Prisma)
+// Conventions:
+//  * UUID primary keys; human-readable numbers are separate unique columns per tenant.
+//  * Every business table carries tenantId; tenant isolation is additionally enforced in the ORM layer.
+//  * User references on regulated records (createdById, approvedById, …) are plain UUID columns.
+//    Users are never deleted (only deactivated) so references remain resolvable.
+//  * Regulated records are never physically deleted: CANCELLED / INACTIVE / voided statuses instead.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+enum MasterStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum MaterialType {
+  API
+  EXCIPIENT
+  PACKAGING
+  CONSUMABLE
+}
+
+enum SupplierStatus {
+  PENDING_QUALIFICATION
+  APPROVED
+  CONDITIONALLY_APPROVED
+  SUSPENDED
+  BLACKLISTED
+}
+
+enum WarehouseType {
+  RAW_MATERIAL
+  PACKAGING
+  FINISHED_GOODS
+  QUARANTINE
+  REJECT
+  GENERAL
+}
+
+enum EquipmentQualificationStatus {
+  QUALIFIED
+  PENDING
+  NOT_QUALIFIED
+  RETIRED
+}
+
+enum ItemType {
+  MATERIAL
+  PRODUCT
+}
+
+enum InventoryStatus {
+  QUARANTINE
+  UNDER_TEST
+  RELEASED
+  REJECTED
+  BLOCKED
+  EXPIRED
+  RETURNED
+  RECALLED
+}
+
+enum InventoryTxnType {
+  GRN_RECEIPT
+  TRANSFER_OUT
+  TRANSFER_IN
+  ISSUE_TO_PRODUCTION
+  RETURN_FROM_PRODUCTION
+  ADJUSTMENT
+  STATUS_CHANGE
+  RESERVE
+  UNRESERVE
+  QC_SAMPLING
+  FG_RECEIPT
+  DISPATCH
+}
+
+enum ReservationStatus {
+  ACTIVE
+  ISSUED
+  RELEASED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+enum GrnStatus {
+  RECEIVED
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductionPlanStatus {
+  DRAFT
+  APPROVED
+  CLOSED
+}
+
+enum BatchStatus {
+  PLANNED
+  MATERIAL_RESERVED
+  READY
+  IN_PROGRESS
+  AWAITING_QC
+  AWAITING_QA
+  RELEASED
+  REJECTED
+  CLOSED
+  CANCELLED
+}
+
+enum BatchStepStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+}
+
+enum QcStage {
+  RAW_MATERIAL
+  PACKAGING_MATERIAL
+  IN_PROCESS
+  FINISHED_PRODUCT
+}
+
+enum QcSampleStatus {
+  REQUESTED
+  COLLECTED
+  IN_TESTING
+  SUBMITTED
+  REVIEWED
+  APPROVED
+  CANCELLED
+}
+
+enum QcConclusion {
+  PASS
+  FAIL
+}
+
+enum SpecResultType {
+  NUMERIC
+  TEXT
+  PASS_FAIL
+}
+
+enum SpecOperator {
+  RANGE
+  MIN
+  MAX
+  EQUALS
+  INFO
+}
+
+enum QcResultStatus {
+  ENTERED
+  INVALIDATED
+}
+
+enum ResultEvaluation {
+  WITHIN_SPEC
+  OOS_CANDIDATE
+  NOT_EVALUATED
+}
+
+enum OosStatus {
+  REPORTED
+  PRELIMINARY_INVESTIGATION
+  LAB_INVESTIGATION
+  MANUFACTURING_INVESTIGATION
+  ROOT_CAUSE
+  IMPACT_ASSESSMENT
+  CAPA
+  QA_APPROVAL
+  CLOSED
+}
+
+enum OosConclusion {
+  CONFIRMED_OOS
+  INVALIDATED_LAB_ERROR
+}
+
+enum DeviationStatus {
+  DRAFT
+  SUBMITTED
+  QA_REVIEW
+  INVESTIGATION
+  ROOT_CAUSE
+  CAPA
+  EFFECTIVENESS_CHECK
+  CLOSED
+  CANCELLED
+}
+
+enum Severity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+enum CapaStatus {
+  OPEN
+  IN_PROGRESS
+  EFFECTIVENESS_CHECK
+  CLOSED
+  CANCELLED
+}
+
+enum CapaSource {
+  DEVIATION
+  OOS
+  OOT
+  AUDIT
+  COMPLAINT
+  SUPPLIER
+  RECALL
+  OTHER
+}
+
+enum CapaActionType {
+  CORRECTIVE
+  PREVENTIVE
+}
+
+enum CapaActionStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum NotificationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AiRole {
+  USER
+  ASSISTANT
+}
+
+enum AiRating {
+  UP
+  DOWN
+}
+
+enum IntegrationStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+// ───────────────────────── Organisation & identity ─────────────────────────
+
+model Tenant {
+  id        String       @id @default(uuid()) @db.Uuid
+  code      String       @unique
+  name      String
+  legalName String?
+  country   String       @default("PK")
+  regulator String       @default("DRAP")
+  timezone  String       @default("Asia/Karachi")
+  currency  String       @default("PKR")
+  settings  Json         @default("{}")
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  sites       Site[]
+  departments Department[]
+  users       User[]
+  roles       Role[]
+
+  @@map("tenants")
+}
+
+model Site {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  code      String
+  name      String
+  city      String?
+  country   String   @default("PK")
+  licenseNo String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  warehouses      Warehouse[]
+  departments     Department[]
+  productionLines ProductionLine[]
+
+  @@unique([tenantId, code])
+  @@map("sites")
+}
+
+model Department {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  siteId    String?  @db.Uuid
+  code      String
+  name      String
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  site   Site?  @relation(fields: [siteId], references: [id])
+  users  User[]
+
+  @@unique([tenantId, code])
+  @@map("departments")
+}
+
+model ProductionLine {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @db.Uuid
+  siteId   String  @db.Uuid
+  code     String
+  name     String
+  area     String?
+  isActive Boolean @default(true)
+
+  site Site @relation(fields: [siteId], references: [id])
+
+  @@unique([tenantId, code])
+  @@map("production_lines")
+}
+
+model User {
+  id               String     @id @default(uuid()) @db.Uuid
+  tenantId         String     @db.Uuid
+  email            String     @unique
+  fullName         String
+  title            String?
+  departmentId     String?    @db.Uuid
+  passwordHash     String
+  status           UserStatus @default(ACTIVE)
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+  externalId       String? // reserved for Entra ID / OIDC subject
+  passwordChangedAt DateTime  @default(now())
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  roles      UserRole[]
+  sessions   Session[]
+
+  @@index([tenantId, status])
+  @@map("users")
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @db.Uuid
+  userId     String    @db.Uuid
+  familyId   String    @db.Uuid
+  tokenHash  String    @unique
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  revokeReason String?
+  replacedById String? @db.Uuid
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, revokedAt])
+  @@index([familyId])
+  @@map("sessions")
+}
+
+model Permission {
+  id          String @id @default(uuid()) @db.Uuid
+  code        String @unique
+  module      String
+  description String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  code        String
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@unique([tenantId, code])
+  @@map("roles")
+}
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// siteId null ⇒ role applies to all sites of the tenant.
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  userId    String   @db.Uuid
+  roleId    String   @db.Uuid
+  siteId    String?  @db.Uuid
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId, siteId])
+  @@map("user_roles")
+}
+
+model NumberSequence {
+  tenantId  String   @db.Uuid
+  scope     String
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([tenantId, scope])
+  @@map("number_sequences")
+}
+
+// ───────────────────────────── Master data ─────────────────────────────
+
+model UnitOfMeasure {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  code     String
+  name     String
+
+  @@unique([tenantId, code])
+  @@map("units_of_measure")
+}
+
+model ProductCategory {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  code     String
+  name     String
+
+  products Product[]
+
+  @@unique([tenantId, code])
+  @@map("product_categories")
+}
+
+model DosageForm {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @db.Uuid
+  code     String
+  name     String
+
+  products Product[]
+
+  @@unique([tenantId, code])
+  @@map("dosage_forms")
+}
+
+model Product {
+  id                 String       @id @default(uuid()) @db.Uuid
+  tenantId           String       @db.Uuid
+  code               String
+  genericName        String
+  brandName          String?
+  dosageFormId       String?      @db.Uuid
+  categoryId         String?      @db.Uuid
+  strength           String
+  packSize           String?
+  shelfLifeMonths    Int
+  storageConditions  String?
+  registrationNumber String?
+  /// GS1 GTIN-14 for 2D DataMatrix labelling (DRAP S.R.O. 963(I)/2026)
+  gtin               String?
+  batchPrefix        String
+  uomId              String       @db.Uuid
+  standardBatchSize  Decimal      @db.Decimal(18, 4)
+  unitPrice          Decimal      @default(0) @db.Decimal(18, 4)
+  status             MasterStatus @default(ACTIVE)
+  version            Int          @default(1)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  dosageForm DosageForm?      @relation(fields: [dosageFormId], references: [id])
+  category   ProductCategory? @relation(fields: [categoryId], references: [id])
+  boms       Bom[]
+  routings   Routing[]
+  batches    Batch[]
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, gtin])
+  @@map("products")
+}
+
+model Material {
+  id                 String       @id @default(uuid()) @db.Uuid
+  tenantId           String       @db.Uuid
+  code               String
+  name               String
+  type               MaterialType
+  uomId              String       @db.Uuid
+  specificationRef   String?
+  storageRequirement String?
+  retestPeriodMonths Int?
+  safetyStock        Decimal      @default(0) @db.Decimal(18, 4)
+  leadTimeDays       Int          @default(30)
+  unitCost           Decimal      @default(0) @db.Decimal(18, 4)
+  lotPrefix          String       @default("RM")
+  status             MasterStatus @default(ACTIVE)
+  version            Int          @default(1)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  suppliers SupplierMaterial[]
+  bomLines  BomLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, type])
+  @@map("materials")
+}
+
+/// Immutable snapshot history for regulated master data.
+model MasterDataVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  entityType  String
+  entityId    String   @db.Uuid
+  version     Int
+  snapshot    Json
+  reason      String?
+  changedById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+
+  @@unique([entityType, entityId, version])
+  @@index([tenantId, entityType, entityId])
+  @@map("master_data_versions")
+}
+
+model Supplier {
+  id                  String         @id @default(uuid()) @db.Uuid
+  tenantId            String         @db.Uuid
+  code                String
+  name                String
+  country             String
+  contactName         String?
+  email               String?
+  phone               String?
+  address             String?
+  status              SupplierStatus @default(PENDING_QUALIFICATION)
+  qualificationDate   DateTime?
+  requalificationDate DateTime?
+  certifications      Json           @default("[]")
+  qualityRating       Decimal?       @db.Decimal(5, 2)
+  deliveryRating      Decimal?       @db.Decimal(5, 2)
+  version             Int            @default(1)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  materials SupplierMaterial[]
+
+  @@unique([tenantId, code])
+  @@map("suppliers")
+}
+
+model SupplierMaterial {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  supplierId String   @db.Uuid
+  materialId String   @db.Uuid
+  approved   Boolean  @default(true)
+  approvedAt DateTime @default(now())
+  manufacturerName String?
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@unique([supplierId, materialId])
+  @@map("supplier_materials")
+}
+
+model Warehouse {
+  id         String        @id @default(uuid()) @db.Uuid
+  tenantId   String        @db.Uuid
+  siteId     String        @db.Uuid
+  code       String
+  name       String
+  type       WarehouseType
+  conditions String?
+  isActive   Boolean       @default(true)
+
+  site Site          @relation(fields: [siteId], references: [id])
+  bins BinLocation[]
+
+  @@unique([tenantId, code])
+  @@map("warehouses")
+}
+
+model BinLocation {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @db.Uuid
+  warehouseId String  @db.Uuid
+  code        String
+  description String?
+  isActive    Boolean @default(true)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@unique([warehouseId, code])
+  @@map("bin_locations")
+}
+
+model Equipment {
+  id                       String                       @id @default(uuid()) @db.Uuid
+  tenantId                 String                       @db.Uuid
+  siteId                   String                       @db.Uuid
+  code                     String
+  description              String
+  type                     String
+  department               String?
+  location                 String?
+  manufacturer             String?
+  model                    String?
+  serialNumber             String?
+  qualificationStatus      EquipmentQualificationStatus @default(QUALIFIED)
+  calibrationFrequencyDays Int?
+  lastCalibrationAt        DateTime?
+  nextCalibrationDue       DateTime?
+  isActive                 Boolean                      @default(true)
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
+
+  calibrations Calibration[]
+
+  @@unique([tenantId, code])
+  @@map("equipment")
+}
+
+model Calibration {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  equipmentId   String   @db.Uuid
+  performedAt   DateTime
+  nextDue       DateTime
+  result        String
+  certificateNo String?
+  performedById String?  @db.Uuid
+  createdAt     DateTime @default(now())
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
+
+  @@map("calibrations")
+}
+
+model Bom {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @db.Uuid
+  productId     String       @db.Uuid
+  version       Int
+  batchSize     Decimal      @db.Decimal(18, 4)
+  status        MasterStatus @default(ACTIVE)
+  effectiveFrom DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+
+  product Product   @relation(fields: [productId], references: [id])
+  lines   BomLine[]
+
+  @@unique([productId, version])
+  @@map("boms")
+}
+
+model BomLine {
+  id           String  @id @default(uuid()) @db.Uuid
+  tenantId     String  @db.Uuid
+  bomId        String  @db.Uuid
+  materialId   String  @db.Uuid
+  quantity     Decimal @db.Decimal(18, 4)
+  tolerancePct Decimal @default(2) @db.Decimal(6, 2)
+  isCritical   Boolean @default(false)
+  stepCode     String?
+
+  bom      Bom      @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@map("bom_lines")
+}
+
+/// Manufacturing template (master eBMR) for a product.
+model Routing {
+  id        String       @id @default(uuid()) @db.Uuid
+  tenantId  String       @db.Uuid
+  productId String       @db.Uuid
+  version   Int
+  status    MasterStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+
+  product Product       @relation(fields: [productId], references: [id])
+  steps   RoutingStep[]
+
+  @@unique([productId, version])
+  @@map("routings")
+}
+
+model RoutingStep {
+  id                     String  @id @default(uuid()) @db.Uuid
+  tenantId               String  @db.Uuid
+  routingId              String  @db.Uuid
+  sequence               Int
+  code                   String
+  name                   String
+  instructions           String
+  equipmentType          String?
+  expectedDurationMin    Int?
+  requiresVerification   Boolean @default(true)
+  /// [{code,label,unit,min,max,required}]
+  parameters             Json    @default("[]")
+  /// [{code,label,unit,min,max}]
+  ipcChecks              Json    @default("[]")
+  /// true for steps where BOM materials are consumed (e.g. dispensing)
+  consumesMaterials      Boolean @default(false)
+  /// true for the step that records output quantity (e.g. packing)
+  recordsOutput          Boolean @default(false)
+
+  routing Routing @relation(fields: [routingId], references: [id], onDelete: Cascade)
+
+  @@unique([routingId, sequence])
+  @@map("routing_steps")
+}
+
+model TestMethod {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  code        String
+  name        String
+  technique   String?
+  reference   String?
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, code])
+  @@map("test_methods")
+}
+
+model QcSpecification {
+  id         String       @id @default(uuid()) @db.Uuid
+  tenantId   String       @db.Uuid
+  code       String
+  name       String
+  stage      QcStage
+  materialId String?      @db.Uuid
+  productId  String?      @db.Uuid
+  version    Int          @default(1)
+  status     MasterStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+
+  tests QcSpecTest[]
+
+  @@unique([tenantId, code, version])
+  @@index([tenantId, materialId])
+  @@index([tenantId, productId])
+  @@map("qc_specifications")
+}
+
+model QcSpecTest {
+  id              String         @id @default(uuid()) @db.Uuid
+  tenantId        String         @db.Uuid
+  specificationId String         @db.Uuid
+  sequence        Int
+  name            String
+  testMethodId    String?        @db.Uuid
+  resultType      SpecResultType
+  operator        SpecOperator
+  minValue        Decimal?       @db.Decimal(18, 4)
+  maxValue        Decimal?       @db.Decimal(18, 4)
+  expectedText    String?
+  unit            String?
+  isMandatory     Boolean        @default(true)
+
+  specification QcSpecification @relation(fields: [specificationId], references: [id], onDelete: Cascade)
+
+  @@map("qc_spec_tests")
+}
+
+// ───────────────────────────── Procurement ─────────────────────────────
+
+model PurchaseOrder {
+  id           String              @id @default(uuid()) @db.Uuid
+  tenantId     String              @db.Uuid
+  siteId       String              @db.Uuid
+  number       String
+  supplierId   String              @db.Uuid
+  status       PurchaseOrderStatus @default(DRAFT)
+  orderDate    DateTime            @default(now())
+  expectedDate DateTime?
+  currency     String              @default("PKR")
+  notes        String?
+  createdById  String              @db.Uuid
+  approvedById String?             @db.Uuid
+  approvedAt   DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  lines PurchaseOrderLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id               String  @id @default(uuid()) @db.Uuid
+  tenantId         String  @db.Uuid
+  purchaseOrderId  String  @db.Uuid
+  materialId       String  @db.Uuid
+  quantity         Decimal @db.Decimal(18, 4)
+  receivedQuantity Decimal @default(0) @db.Decimal(18, 4)
+  unitPrice        Decimal @default(0) @db.Decimal(18, 4)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_order_lines")
+}
+
+model GoodsReceipt {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @db.Uuid
+  siteId          String    @db.Uuid
+  number          String
+  supplierId      String    @db.Uuid
+  purchaseOrderId String?   @db.Uuid
+  status          GrnStatus @default(RECEIVED)
+  receivedAt      DateTime  @default(now())
+  receivedById    String    @db.Uuid
+  deliveryNote    String?
+  remarks         String?
+  createdAt       DateTime  @default(now())
+
+  lines GoodsReceiptLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, receivedAt])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  goodsReceiptId String   @db.Uuid
+  poLineId       String?  @db.Uuid
+  materialId     String   @db.Uuid
+  supplierBatch  String
+  lotId          String   @db.Uuid
+  quantity       Decimal  @db.Decimal(18, 4)
+  containers     Int      @default(1)
+  mfgDate        DateTime
+  expiryDate     DateTime
+  retestDate     DateTime?
+
+  goodsReceipt GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+
+  @@map("goods_receipt_lines")
+}
+
+// ───────────────────────────── Inventory ─────────────────────────────
+
+/// One lot at one location. Splitting across bins creates sibling rows sharing lotNumber.
+model InventoryLot {
+  id               String          @id @default(uuid()) @db.Uuid
+  tenantId         String          @db.Uuid
+  siteId           String          @db.Uuid
+  itemType         ItemType
+  materialId       String?         @db.Uuid
+  productId        String?         @db.Uuid
+  lotNumber        String
+  supplierBatch    String?
+  supplierId       String?         @db.Uuid
+  batchId          String?         @db.Uuid
+  mfgDate          DateTime?
+  expiryDate       DateTime
+  retestDate       DateTime?
+  quantity         Decimal         @db.Decimal(18, 4)
+  reservedQuantity Decimal         @default(0) @db.Decimal(18, 4)
+  uomCode          String
+  warehouseId      String          @db.Uuid
+  binId            String?         @db.Uuid
+  status           InventoryStatus @default(QUARANTINE)
+  sourceType       String
+  sourceId         String?         @db.Uuid
+  unitCost         Decimal         @default(0) @db.Decimal(18, 4)
+  version          Int             @default(0)
+  dispositionById  String?         @db.Uuid
+  dispositionAt    DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  transactions InventoryTransaction[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, materialId, status, expiryDate])
+  @@index([tenantId, productId])
+  @@index([tenantId, lotNumber])
+  @@map("inventory_lots")
+}
+
+model InventoryTransaction {
+  id            String           @id @default(uuid()) @db.Uuid
+  tenantId      String           @db.Uuid
+  siteId        String           @db.Uuid
+  lotId         String           @db.Uuid
+  type          InventoryTxnType
+  quantity      Decimal          @db.Decimal(18, 4)
+  balanceAfter  Decimal          @db.Decimal(18, 4)
+  statusFrom    InventoryStatus?
+  statusTo      InventoryStatus?
+  referenceType String?
+  referenceId   String?          @db.Uuid
+  reason        String?
+  performedById String?          @db.Uuid
+  performedAt   DateTime         @default(now())
+
+  lot InventoryLot @relation(fields: [lotId], references: [id])
+
+  @@index([tenantId, lotId, performedAt])
+  @@index([tenantId, type, performedAt])
+  @@map("inventory_transactions")
+}
+
+model MaterialReservation {
+  id         String            @id @default(uuid()) @db.Uuid
+  tenantId   String            @db.Uuid
+  batchId    String            @db.Uuid
+  lotId      String            @db.Uuid
+  materialId String            @db.Uuid
+  quantity   Decimal           @db.Decimal(18, 4)
+  status     ReservationStatus @default(ACTIVE)
+  createdAt  DateTime          @default(now())
+
+  @@index([tenantId, batchId])
+  @@map("material_reservations")
+}
+
+// ───────────────────────────── Production ─────────────────────────────
+
+model ProductionPlan {
+  id           String               @id @default(uuid()) @db.Uuid
+  tenantId     String               @db.Uuid
+  siteId       String               @db.Uuid
+  number       String
+  name         String
+  periodStart  DateTime
+  periodEnd    DateTime
+  status       ProductionPlanStatus @default(DRAFT)
+  createdById  String               @db.Uuid
+  approvedById String?              @db.Uuid
+  approvedAt   DateTime?
+  createdAt    DateTime             @default(now())
+
+  lines ProductionPlanLine[]
+
+  @@unique([tenantId, number])
+  @@map("production_plans")
+}
+
+model ProductionPlanLine {
+  id               String  @id @default(uuid()) @db.Uuid
+  tenantId         String  @db.Uuid
+  planId           String  @db.Uuid
+  productId        String  @db.Uuid
+  plannedQuantity  Decimal @db.Decimal(18, 4)
+  plannedBatches   Int
+  demandQuantity   Decimal @default(0) @db.Decimal(18, 4)
+
+  plan ProductionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("production_plan_lines")
+}
+
+model Batch {
+  id                  String      @id @default(uuid()) @db.Uuid
+  tenantId            String      @db.Uuid
+  siteId              String      @db.Uuid
+  batchNumber         String
+  productId           String      @db.Uuid
+  planLineId          String?     @db.Uuid
+  bomId               String      @db.Uuid
+  routingId           String      @db.Uuid
+  productionLineId    String?     @db.Uuid
+  plannedQuantity     Decimal     @db.Decimal(18, 4)
+  theoreticalYield    Decimal     @db.Decimal(18, 4)
+  actualYield         Decimal?    @db.Decimal(18, 4)
+  yieldPct            Decimal?    @db.Decimal(7, 2)
+  yieldWithinLimits   Boolean?
+  yieldJustification  String?
+  yieldDeviationId    String?     @db.Uuid
+  uomCode             String
+  status              BatchStatus @default(PLANNED)
+  plannedStart        DateTime
+  plannedEnd          DateTime?
+  actualStart         DateTime?
+  actualEnd           DateTime?
+  mfgDate             DateTime?
+  expiryDate          DateTime?
+  createdById         String      @db.Uuid
+  qaDecisionById      String?     @db.Uuid
+  qaDecisionAt        DateTime?
+  qaDecisionComment   String?
+  version             Int         @default(0)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  product      Product                    @relation(fields: [productId], references: [id])
+  steps        BatchStep[]
+  consumptions BatchMaterialConsumption[]
+
+  @@unique([tenantId, batchNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, productId, createdAt])
+  @@map("batches")
+}
+
+model BatchStep {
+  id                   String          @id @default(uuid()) @db.Uuid
+  tenantId             String          @db.Uuid
+  batchId              String          @db.Uuid
+  routingStepId        String          @db.Uuid
+  sequence             Int
+  code                 String
+  name                 String
+  instructions         String
+  equipmentType        String?
+  expectedDurationMin  Int?
+  requiresVerification Boolean
+  consumesMaterials    Boolean
+  recordsOutput        Boolean
+  parameterDefs        Json
+  ipcDefs              Json
+  status               BatchStepStatus @default(PENDING)
+  equipmentId          String?         @db.Uuid
+  calibrationOverrideReason String?
+  readings             Json            @default("{}")
+  ipcResults           Json            @default("{}")
+  outputQuantity       Decimal?        @db.Decimal(18, 4)
+  remarks              String?
+  startedAt            DateTime?
+  startedById          String?         @db.Uuid
+  completedAt          DateTime?
+  completedById        String?         @db.Uuid
+  completionSignatureId String?        @db.Uuid
+  verifiedAt           DateTime?
+  verifiedById         String?         @db.Uuid
+  verificationSignatureId String?      @db.Uuid
+  hasOutOfLimitReading Boolean         @default(false)
+
+  batch       Batch                 @relation(fields: [batchId], references: [id])
+  corrections BatchStepCorrection[]
+
+  @@unique([batchId, sequence])
+  @@map("batch_steps")
+}
+
+model BatchStepCorrection {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  batchStepId   String   @db.Uuid
+  field         String
+  originalValue Json?
+  newValue      Json?
+  reason        String
+  correctedById String   @db.Uuid
+  correctedAt   DateTime @default(now())
+
+  step BatchStep @relation(fields: [batchStepId], references: [id])
+
+  @@map("batch_step_corrections")
+}
+
+model BatchMaterialConsumption {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @db.Uuid
+  batchId          String   @db.Uuid
+  batchStepId      String?  @db.Uuid
+  materialId       String   @db.Uuid
+  lotId            String   @db.Uuid
+  expectedQuantity Decimal  @db.Decimal(18, 4)
+  actualQuantity   Decimal  @db.Decimal(18, 4)
+  variancePct      Decimal  @db.Decimal(9, 2)
+  uomCode          String
+  recordedById     String   @db.Uuid
+  recordedAt       DateTime @default(now())
+
+  batch Batch @relation(fields: [batchId], references: [id])
+
+  @@index([tenantId, batchId])
+  @@map("batch_material_consumptions")
+}
+
+// ───────────────────────────── Quality Control ─────────────────────────────
+
+model QcSample {
+  id              String          @id @default(uuid()) @db.Uuid
+  tenantId        String          @db.Uuid
+  siteId          String          @db.Uuid
+  number          String
+  stage           QcStage
+  specificationId String          @db.Uuid
+  materialId      String?         @db.Uuid
+  productId       String?         @db.Uuid
+  lotId           String?         @db.Uuid
+  batchId         String?         @db.Uuid
+  status          QcSampleStatus  @default(REQUESTED)
+  conclusion      QcConclusion?
+  requestedAt     DateTime        @default(now())
+  requestedById   String?         @db.Uuid
+  collectedAt     DateTime?
+  collectedById   String?         @db.Uuid
+  sampleQuantity  Decimal?        @db.Decimal(18, 4)
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewedById    String?         @db.Uuid
+  approvedAt      DateTime?
+  approvedById    String?         @db.Uuid
+  remarks         String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  results QcResult[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, batchId])
+  @@index([tenantId, lotId])
+  @@map("qc_samples")
+}
+
+model QcResult {
+  id              String           @id @default(uuid()) @db.Uuid
+  tenantId        String           @db.Uuid
+  sampleId        String           @db.Uuid
+  specTestId      String           @db.Uuid
+  testName        String
+  resultType      SpecResultType
+  /// specification snapshot at time of entry {operator,minValue,maxValue,expectedText,unit}
+  specSnapshot    Json
+  numericValue    Decimal?         @db.Decimal(18, 4)
+  textValue       String?
+  passFail        Boolean?
+  unit            String?
+  evaluation      ResultEvaluation
+  status          QcResultStatus   @default(ENTERED)
+  isRetest        Boolean          @default(false)
+  instrument      String?
+  analystId       String           @db.Uuid
+  enteredAt       DateTime         @default(now())
+  invalidatedReason String?
+  invalidatedById String?          @db.Uuid
+  invalidatedAt   DateTime?
+
+  sample QcSample @relation(fields: [sampleId], references: [id])
+
+  @@index([tenantId, sampleId])
+  @@map("qc_results")
+}
+
+model OosInvestigation {
+  id                          String         @id @default(uuid()) @db.Uuid
+  tenantId                    String         @db.Uuid
+  siteId                      String         @db.Uuid
+  number                      String
+  qcResultId                  String         @db.Uuid
+  sampleId                    String         @db.Uuid
+  productId                   String?        @db.Uuid
+  materialId                  String?        @db.Uuid
+  batchId                     String?        @db.Uuid
+  lotId                       String?        @db.Uuid
+  equipmentId                 String?        @db.Uuid
+  supplierId                  String?        @db.Uuid
+  testName                    String
+  specification               String
+  actualResult                String
+  analystId                   String         @db.Uuid
+  instrument                  String?
+  method                      String?
+  status                      OosStatus      @default(REPORTED)
+  ownerId                     String?        @db.Uuid
+  dueDate                     DateTime
+  preliminaryFindings         String?
+  labInvestigation            String?
+  assignableLabError          Boolean?
+  manufacturingInvestigation  String?
+  rootCause                   String?
+  impactAssessment            String?
+  capaJustification           String?
+  conclusion                  OosConclusion?
+  deviationId                 String?        @db.Uuid
+  closedAt                    DateTime?
+  closedById                  String?        @db.Uuid
+  createdAt                   DateTime       @default(now())
+  updatedAt                   DateTime       @updatedAt
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, batchId])
+  @@map("oos_investigations")
+}
+
+// ───────────────────────────── Quality events ─────────────────────────────
+
+model Deviation {
+  id                    String          @id @default(uuid()) @db.Uuid
+  tenantId              String          @db.Uuid
+  siteId                String          @db.Uuid
+  departmentId          String?         @db.Uuid
+  number                String
+  title                 String
+  description           String
+  immediateAction       String
+  category              String?
+  proposedSeverity      Severity?
+  classification        Severity?
+  productId             String?         @db.Uuid
+  batchId               String?         @db.Uuid
+  materialId            String?         @db.Uuid
+  equipmentId           String?         @db.Uuid
+  oosId                 String?         @db.Uuid
+  status                DeviationStatus @default(DRAFT)
+  occurredAt            DateTime
+  reportedById          String          @db.Uuid
+  ownerId               String?         @db.Uuid
+  dueDate               DateTime?
+  submittedAt           DateTime?
+  qaReviewNotes         String?
+  investigationSummary  String?
+  impactAssessment      String?
+  capaRequired          Boolean?
+  noCapaJustification   String?
+  effectivenessSummary  String?
+  closedAt              DateTime?
+  closedById            String?         @db.Uuid
+  cancelReason          String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, batchId])
+  @@index([tenantId, createdAt])
+  @@map("deviations")
+}
+
+/// Structured RCA (5-Whys + fishbone) for a deviation or OOS. AI suggestions never land here automatically.
+model RootCauseAnalysis {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  deviationId  String?   @db.Uuid
+  oosId        String?   @db.Uuid
+  fiveWhys     Json      @default("[]")
+  /// {HUMAN:[],MACHINE:[],METHOD:[],MATERIAL:[],MEASUREMENT:[],ENVIRONMENT:[]}
+  fishbone     Json      @default("{}")
+  primaryCategory String?
+  statement    String
+  createdById  String    @db.Uuid
+  createdAt    DateTime  @default(now())
+  approvedById String?   @db.Uuid
+  approvedAt   DateTime?
+
+  @@index([tenantId, deviationId])
+  @@index([tenantId, oosId])
+  @@map("root_cause_analyses")
+}
+
+model Capa {
+  id                    String       @id @default(uuid()) @db.Uuid
+  tenantId              String       @db.Uuid
+  siteId                String       @db.Uuid
+  number                String
+  source                CapaSource
+  deviationId           String?      @db.Uuid
+  oosId                 String?      @db.Uuid
+  problemStatement      String
+  rootCause             String?
+  priority              Priority
+  ownerId               String       @db.Uuid
+  departmentId          String?      @db.Uuid
+  dueDate               DateTime
+  status                CapaStatus   @default(OPEN)
+  effectivenessCriteria String?
+  effectivenessResult   String?
+  effectivenessEffective Boolean?
+  effectivenessCheckedAt DateTime?
+  effectivenessCheckedById String?   @db.Uuid
+  effectivenessFailures Int          @default(0)
+  closedAt              DateTime?
+  closedById            String?      @db.Uuid
+  createdById           String       @db.Uuid
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  actions CapaAction[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status, dueDate])
+  @@map("capas")
+}
+
+model CapaAction {
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String           @db.Uuid
+  capaId      String           @db.Uuid
+  type        CapaActionType
+  description String
+  ownerId     String           @db.Uuid
+  dueDate     DateTime
+  status      CapaActionStatus @default(OPEN)
+  evidence    String?
+  aiSuggested Boolean          @default(false)
+  completedAt DateTime?
+  completedById String?        @db.Uuid
+  createdAt   DateTime         @default(now())
+
+  capa Capa @relation(fields: [capaId], references: [id])
+
+  @@map("capa_actions")
+}
+
+model Attachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  entityType   String
+  entityId     String   @db.Uuid
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String
+  sha256       String
+  uploadedById String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, entityType, entityId])
+  @@map("attachments")
+}
+
+// ───────────────────────── Compliance infrastructure ─────────────────────────
+
+model ElectronicSignature {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  userId       String   @db.Uuid
+  signerName   String
+  signerEmail  String
+  entityType   String
+  entityId     String   @db.Uuid
+  action       String
+  meaning      String
+  reason       String?
+  recordHash   String
+  authMethod   String   @default("PASSWORD_REAUTH")
+  ip           String?
+  signedAt     DateTime @default(now())
+
+  @@index([tenantId, entityType, entityId])
+  @@map("electronic_signatures")
+}
+
+/// Append-only. A database trigger rejects UPDATE/DELETE. Rows are hash-chained per tenant.
+model AuditEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  seq           BigInt   @default(autoincrement())
+  tenantId      String?  @db.Uuid
+  userId        String?  @db.Uuid
+  userEmail     String?
+  userName      String?
+  occurredAt    DateTime @default(now())
+  ip            String?
+  userAgent     String?
+  entityType    String
+  entityId      String?
+  entityLabel   String?
+  action        String
+  previousValue Json?
+  newValue      Json?
+  reason        String?
+  correlationId String?
+  signatureId   String?  @db.Uuid
+  prevHash      String?
+  hash          String
+
+  @@unique([seq])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, userId])
+  @@map("audit_events")
+}
+
+model Notification {
+  id         String               @id @default(uuid()) @db.Uuid
+  tenantId   String               @db.Uuid
+  userId     String               @db.Uuid
+  event      String
+  severity   NotificationSeverity @default(INFO)
+  title      String
+  body       String
+  entityType String?
+  entityId   String?
+  link       String?
+  dedupeKey  String?
+  readAt     DateTime?
+  createdAt  DateTime             @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([tenantId, userId, readAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @db.Uuid
+  userId   String  @db.Uuid
+  event    String
+  inApp    Boolean @default(true)
+  email    Boolean @default(false)
+
+  @@unique([userId, event])
+  @@map("notification_preferences")
+}
+
+// ───────────────────────────── AI governance ─────────────────────────────
+
+model AiConversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  userId    String   @db.Uuid
+  title     String
+  feature   String   @default("COPILOT")
+  createdAt DateTime @default(now())
+
+  messages AiMessage[]
+
+  @@index([tenantId, userId])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @db.Uuid
+  conversationId String    @db.Uuid
+  role           AiRole
+  content        String?
+  intent         String?
+  contextRefs    Json      @default("[]")
+  citations      Json      @default("[]")
+  facts          Json?
+  provider       String?
+  model          String?
+  latencyMs      Int?
+  promptTokens   Int?
+  completionTokens Int?
+  redactedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  feedback     AiFeedback[]
+
+  @@index([tenantId, createdAt])
+  @@map("ai_messages")
+}
+
+model AiFeedback {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  rating    AiRating
+  comment   String?
+  createdAt DateTime @default(now())
+
+  message AiMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("ai_feedback")
+}
+
+// ───────────────────────────── Integration ─────────────────────────────
+
+model IntegrationEvent {
+  id          String            @id @default(uuid()) @db.Uuid
+  tenantId    String            @db.Uuid
+  adapter     String
+  direction   String
+  entityType  String
+  source      String
+  payloadRef  String?
+  status      IntegrationStatus @default(PENDING)
+  retryCount  Int               @default(0)
+  error       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([tenantId, status])
+  @@map("integration_events")
+}

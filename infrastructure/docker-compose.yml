@@ -1,0 +1,66 @@
+# Pharmodry local/staging stack. From the repository root:
+#   cp .env.example .env   (fill JWT_ACCESS_SECRET and POSTGRES_PASSWORD)
+#   docker compose -f infrastructure/docker-compose.yml up -d --build
+#   docker compose -f infrastructure/docker-compose.yml run --rm migrate
+# NOTE: not run in the development environment (Docker unavailable) — see docs/DEPLOYMENT.md.
+name: pharmodry
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pharmodry}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-pharmodry}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C.UTF-8
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-pharmodry}']
+      interval: 10s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes: [redisdata:/data]
+
+  migrate:
+    build: { context: .., dockerfile: infrastructure/api.Dockerfile }
+    profiles: [tools]
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pharmodry}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pharmodry}?schema=public
+    depends_on: { db: { condition: service_healthy } }
+
+  api:
+    build: { context: .., dockerfile: infrastructure/api.Dockerfile }
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pharmodry}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pharmodry}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET}
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGINS: http://localhost:3000
+      COOKIE_SECURE: 'false' # set true behind HTTPS
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      MISTRAL_MODEL: ${MISTRAL_MODEL:-mistral-small-latest}
+      STORAGE_LOCAL_DIR: /repo/apps/api/storage
+    volumes: [attachments:/repo/apps/api/storage]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    ports: ['4100:4100']
+
+  web:
+    build:
+      context: ..
+      dockerfile: infrastructure/web.Dockerfile
+      args: { NEXT_PUBLIC_DEMO_MODE: '${NEXT_PUBLIC_DEMO_MODE:-false}' }
+    environment:
+      API_URL: http://api:4100
+    depends_on: [api]
+    ports: ['3000:3000']
+
+volumes:
+  pgdata:
+  redisdata:
+  attachments:

@@ -1,0 +1,40 @@
+{
+  "name": "pharmodry",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pharmodry — Pharmaceutical Operations, Quality & Compliance Intelligence Platform",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:packages": "npm run build -w @pharmodry/types -w @pharmodry/validation -w @pharmodry/ui",
+    "build": "npm run build:packages && npm run build -w @pharmodry/api && npm run build -w @pharmodry/web",
+    "lint": "npm run lint -w @pharmodry/api -w @pharmodry/web",
+    "typecheck": "npm run typecheck -w @pharmodry/api -w @pharmodry/web",
+    "test": "npm run test -w @pharmodry/api",
+    "test:e2e": "npm run test:e2e -w @pharmodry/api",
+    "test:ui": "node infrastructure/test-env.mjs -- npm run test:ui -w @pharmodry/web",
+    "db:start": "node infrastructure/dev-postgres.mjs",
+    "db:migrate": "npm run db:migrate -w @pharmodry/api",
+    "db:seed": "npm run db:seed -w @pharmodry/api",
+    "db:reset": "npm run db:reset -w @pharmodry/api",
+    "dev:api": "npm run dev -w @pharmodry/api",
+    "dev:web": "npm run dev -w @pharmodry/web",
+    "test:all": "npm run test && npm run test:e2e && npm run test:ui",
+    "manuals:capture": "node infrastructure/test-env.mjs -- npm run manuals:capture -w @pharmodry/web",
+    "manuals:build": "node docs/USER_MANUALS/SOURCES/build-manuals.mjs",
+    "manuals": "npm run manuals:capture && npm run manuals:build"
+  },
+  "devDependencies": {
+    "embedded-postgres": "17.5.0-beta.15"
+  },
+  "allowScripts": {
+    "@prisma/engines@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "prisma@6.19.3": true
+  }
+}

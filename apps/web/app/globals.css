@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens (HSL). Status colours are semantic and shared with @pharmodry/ui tones. */
+@layer base {
+  :root {
+    --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --font-mono: 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+    /* Pharmodry brand — see docs/BRAND/BRAND_GUIDELINES.md */
+    --brand-navy: #0b1e3f;
+    --brand-cobalt: #1f4fcc;
+    --brand-cyan: #0b93a3;
+    --brand-cyan-bright: #13b5c7;
+    --background: 216 45% 98%;
+    --foreground: 217 70% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 217 70% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 217 70% 15%;
+    --primary: 224 74% 46%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 218 40% 95%;
+    --secondary-foreground: 217 70% 15%;
+    --muted: 218 40% 95%;
+    --muted-foreground: 219 19% 40%;
+    --accent: 220 76% 95%;
+    --accent-foreground: 224 73% 38%;
+    --destructive: 0 72% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 218 30% 88%;
+    --input: 218 28% 83%;
+    --ring: 224 74% 46%;
+    --radius: 0.6rem;
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 217 45% 22%;
+    --sidebar-muted: 219 16% 47%;
+    --sidebar-active: 220 76% 95%;
+    --success: 152 69% 31%;
+    --warning: 32 95% 40%;
+    --danger: 0 72% 46%;
+    --info: 213 80% 45%;
+    --progress: 262 55% 50%;
+    /* Data-viz tokens: validated reference palette (dataviz skill, references/palette.md) */
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --seq-250: #86b6ef;
+    --seq-450: #2a78d6;
+    --seq-650: #104281;
+    --chart-grid: #e6e6e3;
+    --chart-axis: #52514e;
+  }
+
+  .dark {
+    --background: 219 50% 7%;
+    --foreground: 214 40% 94%;
+    --card: 218 45% 10%;
+    --card-foreground: 214 40% 94%;
+    --popover: 218 45% 11%;
+    --popover-foreground: 214 40% 94%;
+    --primary: 222 84% 73%;
+    --primary-foreground: 219 50% 7%;
+    --secondary: 220 26% 16%;
+    --secondary-foreground: 210 30% 92%;
+    --muted: 220 26% 15%;
+    --muted-foreground: 215 18% 65%;
+    --accent: 222 45% 18%;
+    --accent-foreground: 222 84% 80%;
+    --destructive: 0 70% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 22% 20%;
+    --input: 220 22% 24%;
+    --ring: 222 84% 73%;
+    --sidebar: 219 52% 9%;
+    --sidebar-foreground: 210 25% 88%;
+    --sidebar-muted: 215 15% 60%;
+    --sidebar-active: 222 45% 18%;
+    --success: 152 55% 50%;
+    --warning: 38 92% 58%;
+    --danger: 0 75% 62%;
+    --info: 210 85% 64%;
+    --progress: 262 70% 72%;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --seq-250: #184f95;
+    --seq-450: #3987e5;
+    --seq-650: #9ec5f4;
+    --chart-grid: #2c2c2a;
+    --chart-axis: #c3c2b7;
+  }
+
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-background text-foreground font-sans text-[14px] leading-normal;
+  }
+  h1, h2, h3 {
+    @apply tracking-tight;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+  input[type='number']::-webkit-inner-spin-button {
+    opacity: 0.5;
+  }
+}
+
+@layer components {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    @apply bg-white text-black;
+  }
+  .print-break {
+    break-before: page;
+  }
+}

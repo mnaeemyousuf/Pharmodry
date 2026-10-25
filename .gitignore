@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.next/
+.next-dev/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local data — embedded PostgreSQL cluster, uploaded attachments (never commit)
+.data/
+**/storage/
+
+# Environment files with credentials (templates are *.env.example)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Test artefacts
+**/test-results/
+**/playwright-report/
+coverage/
+docs/USER_MANUALS/SCREENSHOTS/_parts/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
