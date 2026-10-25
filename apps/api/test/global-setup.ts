@@ -25,6 +25,8 @@ export default async function globalSetup() {
   await client.$disconnect();
   const dbUrl = new URL(admin.toString());
   dbUrl.pathname = `/${name}`;
+  // E2E_DB_SCHEMA=pharmodry runs the suite inside a named schema (as on a shared hosted database).
+  if (process.env.E2E_DB_SCHEMA) dbUrl.searchParams.set('schema', process.env.E2E_DB_SCHEMA);
   const env = { ...process.env, DATABASE_URL: dbUrl.toString(), DISABLE_SCHEDULER: 'true' };
   const cwd = resolve(__dirname, '..');
   execSync('npx prisma migrate deploy', { cwd, env, stdio: 'ignore' });

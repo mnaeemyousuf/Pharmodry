@@ -120,3 +120,37 @@ Required in production:
 - `COOKIE_SECURE=true`
 - `API_URL` (web)
 - `NEXT_PUBLIC_DEMO_MODE=false`
+
+## Render (demo deployment, 2026-10-25)
+
+Two free web services in **Singapore**, built from `github.com/mnaeemyousuf/Pharmodry` (`main`, auto-deploy on push). The database is a dedicated **`pharmodry` schema** inside the existing Render Postgres `tms-demo-db` (Frankfurt), so the TMS tables are untouched. This was verified by running the whole test suite in a named schema.
+
+| Service | Build command | Start command |
+|---|---|---|
+| `pharmodry-api` | `npm ci --include=dev && npm run build:packages && npm run build -w @pharmodry/api` | `node apps/api/scripts/render-start.mjs` (migrate → seed once → start) |
+| `pharmodry` (web) | `npm ci --include=dev && npm run build:packages && npm run build -w @pharmodry/web` | `cd apps/web && npx next start -p $PORT` |
+
+**API environment.** Set by deployment:
+- `NODE_ENV=production`
+- `NODE_VERSION=22`
+- `DB_SCHEMA=pharmodry`
+- `ALLOW_DEMO_SEED=true`
+- `COOKIE_SECURE=true`
+- `TRUST_PROXY_HOPS=2` (Render proxy + web proxy, so rate limits see real client IPs)
+- `CORS_ORIGINS=<web URL>`
+
+**Secrets the owner adds in the Render dashboard** (never committed or handled by tooling):
+- `DATABASE_URL`: the **external** connection URL of `tms-demo-db`. External access must be enabled on that database (Networking → allow the services' outbound IPs, or 0.0.0.0/0 for a demo). `sslmode=require` is added automatically.
+- `JWT_ACCESS_SECRET`: at least 32 random characters.
+
+**Web environment:**
+- `API_URL=<API URL>`
+- `NODE_VERSION=22`
+- `NEXT_PUBLIC_DEMO_MODE=true`
+
+**Caveats:**
+- Free instances sleep after about 15 minutes idle; the first request then takes about a minute.
+- Services in Singapore querying a database in Frankfurt add roughly 170 ms per query.
+- The local disk is ephemeral, so uploaded attachments are lost on restart or redeploy.
+- `tms-demo-db` is a free Render database that Render deletes on **11 Nov 2026**. Move to a dedicated database before then.
+- This is a public demo with fictional data and the documented demo password. Do not enter real data.

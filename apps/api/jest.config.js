@@ -2,6 +2,8 @@
 const tsJest = ['ts-jest', { tsconfig: 'tsconfig.json', diagnostics: false }];
 module.exports = {
   testTimeout: 120000,
+  // E2E suites share one seeded database; run test files serially so assertions never race each other.
+  maxWorkers: 1,
   projects: [
     {
       displayName: 'unit',

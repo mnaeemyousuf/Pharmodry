@@ -12,7 +12,8 @@ export function configureApp(app: INestApplication) {
   const cfg = loadConfig();
   app.setGlobalPrefix('api/v1');
   const express = app.getHttpAdapter().getInstance() as { set: (k: string, v: unknown) => void; disable: (k: string) => void };
-  express.set('trust proxy', 1);
+  // Reverse-proxy hops in front of the API (Render: platform proxy + web app proxy = 2). Used for client IPs in rate limits/audit.
+  express.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
   express.disable('x-powered-by');
   app.use(
     helmet({
