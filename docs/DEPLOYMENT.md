@@ -140,7 +140,7 @@ Two free web services in **Singapore**, built from `github.com/mnaeemyousuf/Phar
 - `CORS_ORIGINS=<web URL>`
 
 **Secrets the owner adds in the Render dashboard** (never committed or handled by tooling):
-- `DATABASE_URL`: the **external** connection URL of `tms-demo-db`. External access must be enabled on that database (Networking → allow the services' outbound IPs, or 0.0.0.0/0 for a demo). `sslmode=require` is added automatically.
+- `DATABASE_URL`: the connection URL of `tms-demo-db` (internal or external; with `DB_HOST_SUFFIX=.frankfurt-postgres.render.com` an internal host is converted to the external one automatically). External access must be enabled on that database (Networking → allow the services' outbound IPs, or 0.0.0.0/0 for a demo). `sslmode=require` is added automatically.
 - `JWT_ACCESS_SECRET`: at least 32 random characters.
 
 **Web environment:**

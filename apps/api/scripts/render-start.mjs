@@ -20,6 +20,10 @@ if (!raw) {
   process.exit(1);
 }
 const url = new URL(raw);
+// A Render *internal* host (e.g. "dpg-abc123-a") only resolves inside the database's own region. When the service
+// runs in another region, DB_HOST_SUFFIX (e.g. ".frankfurt-postgres.render.com") turns it into the external host;
+// the credentials are identical, so the stored DATABASE_URL does not need to change.
+if (process.env.DB_HOST_SUFFIX && /^dpg-[a-z0-9]+-a$/.test(url.hostname)) url.hostname += process.env.DB_HOST_SUFFIX;
 if (process.env.DB_SCHEMA && !url.searchParams.has('schema')) url.searchParams.set('schema', process.env.DB_SCHEMA);
 // Hosted Postgres external endpoints require TLS.
 if (!url.searchParams.has('sslmode') && !['localhost', '127.0.0.1', '::1'].includes(url.hostname) && !/^dpg-[a-z0-9-]+$/.test(url.hostname)) {
@@ -31,7 +35,20 @@ const prismaBin = resolve(apiDir, '../../node_modules/prisma/build/index.js');
 
 console.log(`[start] database host ${url.hostname}, schema ${url.searchParams.get('schema') ?? 'public'}`);
 console.log('[start] applying migrations…');
-run(process.execPath, [prismaBin, 'migrate', 'deploy']);
+try {
+  run(process.execPath, [prismaBin, 'migrate', 'deploy']);
+} catch {
+  console.error(
+    [
+      '[start] Could not apply migrations — the database is not reachable or refused the connection.',
+      `[start] Host: ${url.hostname}`,
+      '[start] Checklist: (1) DATABASE_URL is the database URL; (2) if the database is in another Render region, its',
+      '[start] Networking settings must allow external connections (inbound rule, e.g. 0.0.0.0/0 for a demo) and',
+      '[start] DB_HOST_SUFFIX must be set (e.g. .frankfurt-postgres.render.com). See docs/DEPLOYMENT.md.',
+    ].join('\n'),
+  );
+  process.exit(1);
+}
 
 if (process.env.ALLOW_DEMO_SEED === 'true') {
   console.log('[start] demo seed (skipped automatically if demo data already exists)…');
