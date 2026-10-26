@@ -10,6 +10,7 @@
  *      ALLOW_DEMO_SEED=true (demo environments only), plus the normal API variables (docs/DEPLOYMENT.md).
  */
 import { execFileSync, spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,6 +31,13 @@ if (!url.searchParams.has('sslmode') && !['localhost', '127.0.0.1', '::1'].inclu
   url.searchParams.set('sslmode', 'require');
 }
 const env = { ...process.env, DATABASE_URL: url.toString() };
+// No JWT_ACCESS_SECRET configured: generate a strong random one for this process (never logged or stored).
+// Refresh tokens live in the database, so a restart only makes signed-in users silently re-authenticate.
+// Set a permanent JWT_ACCESS_SECRET in the service environment for stable sessions across restarts.
+if (!env.JWT_ACCESS_SECRET) {
+  env.JWT_ACCESS_SECRET = randomBytes(48).toString('base64url');
+  console.warn('[start] JWT_ACCESS_SECRET not set — using a random per-start secret. Set a permanent one in the service environment.');
+}
 const run = (cmd, args) => execFileSync(cmd, args, { cwd: apiDir, env, stdio: 'inherit' });
 const prismaBin = resolve(apiDir, '../../node_modules/prisma/build/index.js');
 
@@ -50,12 +58,15 @@ try {
   process.exit(1);
 }
 
-if (process.env.ALLOW_DEMO_SEED === 'true') {
-  console.log('[start] demo seed (skipped automatically if demo data already exists)…');
-  run(process.execPath, ['-r', 'ts-node/register/transpile-only', 'prisma/seed.ts']);
-}
-
+// Start the API first so the platform detects the open port promptly, even when seeding is slow
+// (e.g. service and database in different regions).
 console.log('[start] starting API…');
 const child = spawn(process.execPath, ['--enable-source-maps', 'dist/main.js'], { cwd: apiDir, env, stdio: 'inherit' });
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => child.kill(sig));
 child.on('exit', (code) => process.exit(code ?? 1));
+
+if (process.env.ALLOW_DEMO_SEED === 'true') {
+  console.log('[start] demo seed running in the background (skipped automatically if demo data already exists)…');
+  const seed = spawn(process.execPath, ['-r', 'ts-node/register/transpile-only', 'prisma/seed.ts'], { cwd: apiDir, env, stdio: 'inherit' });
+  seed.on('exit', (code) => console.log(code === 0 ? '[start] demo seed finished.' : `[start] demo seed exited with code ${code}; the API keeps running.`));
+}
